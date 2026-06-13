@@ -4,20 +4,72 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
-      // Prevent TypeError: Cannot set property fetch of #<Window> which has only a getter
-      try {
-        const originalFetch = window.fetch;
-        if (originalFetch) {
-          Object.defineProperty(window, 'fetch', {
-            value: originalFetch,
-            writable: true,
-            configurable: true,
-            enumerable: true
-          });
+      (function() {
+        try {
+          var originalFetch = window.fetch;
+          var customFetch = originalFetch;
+
+          // Define setter/getter on Window.prototype to intercept assignments like window.fetch = ...
+          try {
+            Object.defineProperty(Window.prototype, 'fetch', {
+              get: function() {
+                return customFetch;
+              },
+              set: function(value) {
+                customFetch = value;
+              },
+              configurable: true,
+              enumerable: true
+            });
+          } catch (e) {
+            console.warn("Window.prototype.fetch override failed:", e);
+          }
+
+          // Try to define on window instance directly too
+          try {
+            Object.defineProperty(window, 'fetch', {
+              get: function() {
+                return customFetch;
+              },
+              set: function(value) {
+                customFetch = value;
+              },
+              configurable: true,
+              enumerable: true
+            });
+          } catch (e) {
+            console.warn("window.fetch override failed:", e);
+          }
+
+          // Intercept assignments on global
+          try {
+            var globalProxy = new Proxy(window, {
+              get: function(target, prop) {
+                if (prop === 'fetch') return customFetch;
+                if (prop === 'global') return globalProxy;
+                var val = target[prop];
+                if (typeof val === 'function') {
+                  return val.bind(target);
+                }
+                return val;
+              },
+              set: function(target, prop, value) {
+                if (prop === 'fetch') {
+                  customFetch = value;
+                  return true;
+                }
+                target[prop] = value;
+                return true;
+              }
+            });
+            window.global = globalProxy;
+          } catch (e) {
+            console.warn("global Proxy creation failed:", e);
+          }
+        } catch (err) {
+          console.error("Fetch polyfill wrapper total error:", err);
         }
-      } catch (e) {
-        console.warn("Could not make window.fetch writable:", e);
-      }
+      })();
     </script>
     <title>AnatomiaPro — Обучающий тренажер по анатомии человека</title>
   </head>

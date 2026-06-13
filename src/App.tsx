@@ -34,6 +34,11 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          // If they saved the old default questions (or a smaller database), auto-upgrade them to the rich 1798-question database
+          if (parsed.length < 1500) {
+            console.log("Upgrading questions dataset to the new comprehensive database of 1798 items!");
+            return DEFAULT_QUESTIONS;
+          }
           return parsed;
         }
       } catch (e) {
@@ -82,6 +87,11 @@ export default function App() {
     return [];
   });
 
+  const [confirmModal, setConfirmModal] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
   // Persist State Changes
   useEffect(() => {
     localStorage.setItem('anatomy_quiz_questions', JSON.stringify(questions));
@@ -113,12 +123,15 @@ export default function App() {
   };
 
   const resetToDefaultQuestions = () => {
-    if (window.confirm("Вы уверены, что хотите сбросить вопросы к стандартной базе (30 демонстрационных вопросов)?")) {
-      setQuestions(DEFAULT_QUESTIONS);
-      setErrorQueue([]);
-      setSession(null);
-      setView('menu');
-    }
+    setConfirmModal({
+      message: `Вы уверены, что хотите сбросить вопросы к стандартной базе (${DEFAULT_QUESTIONS.length} вопросов по всему анатомическому курсу)?`,
+      onConfirm: () => {
+        setQuestions(DEFAULT_QUESTIONS);
+        setErrorQueue([]);
+        setSession(null);
+        setView('menu');
+      }
+    });
   };
 
   // Fisher-Yates shuffle helper
@@ -200,10 +213,13 @@ export default function App() {
   };
 
   const handleExitQuiz = () => {
-    if (window.confirm("Вы уверены, что хотите завершить текущий тест? Прогресс этого тестирования будет сброшен.")) {
-      setSession(null);
-      setView('menu');
-    }
+    setConfirmModal({
+      message: "Вы уверены, что хотите завершить текущий тест? Прогресс этого тестирования будет сброшен.",
+      onConfirm: () => {
+        setSession(null);
+        setView('menu');
+      }
+    });
   };
 
   const handleRetryBlock = () => {
@@ -241,9 +257,12 @@ export default function App() {
   };
 
   const handleClearGlobalErrors = () => {
-    if (window.confirm("Сбросить текущий список ошибочных вопросов? Ваша статистика будет очищена.")) {
-      setErrorQueue([]);
-    }
+    setConfirmModal({
+      message: "Сбросить текущий список ошибочных вопросов? Ваша статистика будет очищена.",
+      onConfirm: () => {
+        setErrorQueue([]);
+      }
+    });
   };
 
   // Generate blocks based on configured size and loaded questions
@@ -557,6 +576,38 @@ export default function App() {
         )}
 
       </main>
+
+      {/* Elegant Custom Confirmation Modal for Iframe compatibility */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in animate-duration-200">
+          <div className="bg-[#0c0c0c] border border-white/10 p-6 sm:p-8 max-w-md w-full rounded-none space-y-6 shadow-2xl relative">
+            <h3 className="text-xs font-mono uppercase tracking-[0.2em] text-red-400 font-bold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-500" />
+              Подтверждение действия
+            </h3>
+            <p className="text-gray-300 text-xs sm:text-sm leading-relaxed font-light">
+              {confirmModal.message}
+            </p>
+            <div className="flex items-center justify-end gap-3 font-mono pt-2">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 border border-white/15 hover:bg-white/5 text-gray-400 hover:text-white transition-all text-xs tracking-wider uppercase cursor-pointer"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                className="px-5 py-2 bg-white text-black hover:bg-gray-200 transition-all text-xs font-bold tracking-wider uppercase cursor-pointer"
+              >
+                Подтвердить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
